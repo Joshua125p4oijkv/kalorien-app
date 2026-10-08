@@ -19,11 +19,13 @@
   </header>
 
   <main>
+   <div class="view" id="view-food">
     <section class="card summary">
       <div class="big"><span id="remaining">0</span><small>kcal übrig</small></div>
       <div class="bar"><div id="barFill"></div></div>
       <div class="row">
         <span>Gegessen: <b id="eaten">0</b></span>
+        <span>Training: <b id="burnedFood">0</b></span>
         <span>Ziel: <b id="goal">2000</b></span>
       </div>
       <div class="macros">
@@ -38,9 +40,80 @@
       <ul id="entries" class="list"></ul>
       <p id="empty" class="muted">Noch nichts eingetragen.</p>
     </section>
+   </div>
+
+   <div class="view" id="view-weight" hidden>
+    <section class="card summary">
+      <div class="big"><span id="wNow">–</span><small>kg aktuell</small></div>
+      <div class="row">
+        <span>Seit Start: <b id="wChange">–</b></span>
+        <span>Ziel: <b id="wGoal">–</b></span>
+      </div>
+      <svg id="wChart" viewBox="0 0 320 140" preserveAspectRatio="none" role="img" aria-label="Gewichtsverlauf"></svg>
+    </section>
+    <section>
+      <h2>Verlauf</h2>
+      <ul id="weights" class="list"></ul>
+      <p id="wEmpty" class="muted">Noch kein Gewicht eingetragen.</p>
+    </section>
+   </div>
+
+   <div class="view" id="view-train" hidden>
+    <section class="card summary">
+      <div class="big"><span id="burned">0</span><small>kcal verbrannt</small></div>
+      <div class="row">
+        <span>Trainings: <b id="tCount">0</b></span>
+        <span>Minuten: <b id="tMin">0</b></span>
+      </div>
+    </section>
+    <section>
+      <h2>Trainings</h2>
+      <ul id="trainings" class="list"></ul>
+      <p id="tEmpty" class="muted">Heute noch kein Training.</p>
+    </section>
+   </div>
   </main>
 
   <button class="fab" id="openAdd">+ Essen</button>
+
+  <nav class="bottom-nav">
+    <button data-view="food" class="active"><span>🍽</span>Essen</button>
+    <button data-view="weight"><span>⚖</span>Gewicht</button>
+    <button data-view="train"><span>🏃</span>Training</button>
+  </nav>
+
+  <!-- Gewicht eintragen -->
+  <dialog id="weightDlg">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2 id="weightTitle">Gewicht eintragen</h2>
+        <button class="icon-btn" data-close aria-label="Schließen">✕</button>
+      </div>
+      <form id="weightForm" class="stack">
+        <label>Gewicht in kg <input id="weightInput" type="number" min="20" max="400" step="0.1" inputmode="decimal" required></label>
+        <button type="submit" class="primary">Speichern</button>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- Training eintragen -->
+  <dialog id="trainDlg">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2>Training eintragen</h2>
+        <button class="icon-btn" data-close aria-label="Schließen">✕</button>
+      </div>
+      <form id="trainForm" class="stack">
+        <label>Art
+          <select id="tType"></select>
+        </label>
+        <label>Dauer in Minuten <input id="tDuration" type="number" min="1" max="600" value="30" required></label>
+        <label>Verbrannte kcal (geschätzt, änderbar) <input id="tKcal" type="number" min="0" required></label>
+        <label>Notiz (optional) <input id="tNote" placeholder="z. B. Brust & Trizeps, 5 km"></label>
+        <button type="submit" class="primary">Hinzufügen</button>
+      </form>
+    </div>
+  </dialog>
 
   <!-- Essen hinzufügen -->
   <dialog id="addDlg">
@@ -115,6 +188,7 @@
       </div>
       <form id="settingsForm" class="stack">
         <label>Tagesziel (kcal) <input id="goalInput" type="number" min="500" max="10000" required></label>
+        <label>Zielgewicht in kg (optional) <input id="wGoalInput" type="number" min="20" max="400" step="0.1"></label>
         <button type="submit" class="primary">Speichern</button>
       </form>
     </div>

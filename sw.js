@@ -1,5 +1,5 @@
 // Speichert die App, damit sie auch offline startet.
-const CACHE = "kt-v2";
+const CACHE = "kt-v3";
 const FILES = ["./", "index.html", "style.css", "app.js", "manifest.json", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", (e) => {

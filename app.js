@@ -47,28 +47,37 @@ function saveEntries(list) {
 }
 
 function render() {
+  $("#dayLabel").textContent = dayLabel(day);
+  $("#nextDay").disabled = day >= dateStr();
+  $("#nextDay").style.visibility = day >= dateStr() ? "hidden" : "visible";
+  renderFood();
+  renderWeight();
+  renderTraining();
+}
+
+function renderFood() {
   const entries = getEntries();
   const goal = store.get("goal", 2000);
+  const burned = getTrainings().reduce((a, t) => a + t.kcal, 0);
   const sum = entries.reduce(
     (a, e) => ({ kcal: a.kcal + e.kcal, p: a.p + e.p, c: a.c + e.c, f: a.f + e.f }),
     { kcal: 0, p: 0, c: 0, f: 0 }
   );
 
-  $("#dayLabel").textContent = dayLabel(day);
-  $("#nextDay").disabled = day >= dateStr();
-  $("#nextDay").style.visibility = day >= dateStr() ? "hidden" : "visible";
-
-  const rest = goal - sum.kcal;
+  // Training gibt zusätzliche Kalorien frei
+  const budget = goal + burned;
+  const rest = budget - sum.kcal;
   $("#remaining").textContent = round(Math.abs(rest));
   $("#remaining").nextElementSibling.textContent = rest >= 0 ? "kcal übrig" : "kcal zu viel";
   $("#eaten").textContent = round(sum.kcal);
+  $("#burnedFood").textContent = "+" + round(burned);
   $("#goal").textContent = goal;
   $("#mP").textContent = round(sum.p);
   $("#mC").textContent = round(sum.c);
   $("#mF").textContent = round(sum.f);
 
   const fill = $("#barFill");
-  fill.style.width = Math.min(100, (sum.kcal / goal) * 100) + "%";
+  fill.style.width = Math.min(100, (sum.kcal / budget) * 100) + "%";
   fill.classList.toggle("over", rest < 0);
 
   const ul = $("#entries");
@@ -99,6 +108,204 @@ function addEntry(entry) {
   list.push({ id: Date.now() + Math.random(), ...entry });
   saveEntries(list);
   render();
+}
+
+// ---------- Ansichten (Essen / Gewicht / Training) ----------
+let view = "food";
+const FAB_TEXT = { food: "+ Essen", weight: "+ Gewicht", train: "+ Training" };
+
+function showView(name) {
+  view = name;
+  document.querySelectorAll(".view").forEach((v) => (v.hidden = v.id !== "view-" + name));
+  document.querySelectorAll(".bottom-nav button").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
+  $("#openAdd").textContent = FAB_TEXT[name];
+  window.scrollTo(0, 0);
+}
+document.querySelectorAll(".bottom-nav button").forEach((b) => (b.onclick = () => showView(b.dataset.view)));
+
+// ---------- Gewicht ----------
+const fmtKg = (n) => n.toFixed(1).replace(".", ",");
+
+function getWeights() {
+  // sortierte Liste [{date, kg}]
+  return Object.entries(store.get("weights", {}))
+    .map(([date, kg]) => ({ date, kg }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function latestWeight() {
+  const w = getWeights();
+  return w.length ? w[w.length - 1].kg : null;
+}
+
+function renderWeight() {
+  const list = getWeights();
+  const goalW = store.get("weightGoal", null);
+  $("#wGoal").textContent = goalW ? fmtKg(goalW) + " kg" : "–";
+  $("#wEmpty").hidden = list.length > 0;
+
+  if (list.length) {
+    const first = list[0].kg;
+    const last = list[list.length - 1].kg;
+    const diff = last - first;
+    $("#wNow").textContent = fmtKg(last);
+    const ch = $("#wChange");
+    ch.textContent = (diff > 0 ? "+" : "") + fmtKg(diff) + " kg";
+    ch.className = diff > 0 ? "up" : diff < 0 ? "down" : "";
+  } else {
+    $("#wNow").textContent = "–";
+    $("#wChange").textContent = "–";
+  }
+
+  drawChart(list.slice(-30), goalW);
+
+  const ul = $("#weights");
+  ul.innerHTML = "";
+  [...list].reverse().forEach((w, i, arr) => {
+    const prev = arr[i + 1];
+    const d = prev ? w.kg - prev.kg : 0;
+    const li = document.createElement("li");
+    li.innerHTML = `<div class="info"><div class="name"></div><div class="sub"></div></div>
+      <span class="kcal">${fmtKg(w.kg)} kg</span>
+      <button class="del" aria-label="Löschen">✕</button>`;
+    li.querySelector(".name").textContent = dayLabel(w.date);
+    li.querySelector(".sub").textContent = prev ? (d > 0 ? "+" : "") + fmtKg(d) + " kg zum letzten Mal" : "Start";
+    li.querySelector(".del").onclick = () => {
+      const all = store.get("weights", {});
+      delete all[w.date];
+      store.set("weights", all);
+      render();
+    };
+    ul.appendChild(li);
+  });
+}
+
+function drawChart(points, goalW) {
+  const svg = $("#wChart");
+  svg.innerHTML = "";
+  svg.style.display = points.length >= 2 ? "block" : "none";
+  if (points.length < 2) return;
+  const W = 320, H = 140, pad = 10;
+  const vals = points.map((p) => p.kg).concat(goalW ? [goalW] : []);
+  let min = Math.min(...vals), max = Math.max(...vals);
+  if (max - min < 1) { min -= 0.5; max += 0.5; }
+  const x = (i) => pad + (i / (points.length - 1)) * (W - 2 * pad);
+  const y = (kg) => pad + ((max - kg) / (max - min)) * (H - 2 * pad);
+  const ns = "http://www.w3.org/2000/svg";
+  if (goalW) {
+    const g = document.createElementNS(ns, "line");
+    g.setAttribute("class", "goal");
+    g.setAttribute("x1", 0); g.setAttribute("x2", W);
+    g.setAttribute("y1", y(goalW)); g.setAttribute("y2", y(goalW));
+    svg.appendChild(g);
+  }
+  const path = document.createElementNS(ns, "polyline");
+  path.setAttribute("class", "line");
+  path.setAttribute("points", points.map((p, i) => `${x(i)},${y(p.kg)}`).join(" "));
+  svg.appendChild(path);
+}
+
+function openWeight() {
+  $("#weightTitle").textContent = "Gewicht – " + dayLabel(day);
+  $("#weightInput").value = store.get("weights", {})[day] ?? latestWeight() ?? "";
+  $("#weightDlg").showModal();
+  $("#weightInput").select();
+}
+
+$("#weightForm").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const kg = parseFloat($("#weightInput").value.replace(",", "."));
+  if (!kg) return;
+  const all = store.get("weights", {});
+  all[day] = Math.round(kg * 10) / 10;
+  store.set("weights", all);
+  $("#weightDlg").close();
+  render();
+});
+
+// ---------- Training ----------
+// MET-Werte: wie anstrengend eine Sportart ist (grobe Durchschnittswerte)
+const SPORTS = [
+  ["Krafttraining", 5],
+  ["Laufen / Joggen", 9],
+  ["Gehen / Spazieren", 3.5],
+  ["Radfahren", 7],
+  ["Schwimmen", 7],
+  ["Fußball", 7],
+  ["Basketball", 6.5],
+  ["HIIT / Zirkeltraining", 8],
+  ["Yoga / Dehnen", 2.5],
+  ["Tanzen", 5],
+  ["Sonstiges", 5],
+];
+
+function getTrainings() {
+  return store.get("workouts", {})[day] || [];
+}
+function saveTrainings(list) {
+  const all = store.get("workouts", {});
+  if (list.length) all[day] = list; else delete all[day];
+  store.set("workouts", all);
+}
+
+function estimateKcal() {
+  const met = SPORTS[+$("#tType").value][1];
+  const kg = latestWeight() || 70;
+  const min = +$("#tDuration").value || 0;
+  $("#tKcal").value = Math.round(met * kg * (min / 60));
+}
+
+$("#tType").innerHTML = SPORTS.map(([name], i) => `<option value="${i}">${name}</option>`).join("");
+$("#tType").addEventListener("change", estimateKcal);
+$("#tDuration").addEventListener("input", estimateKcal);
+
+function openTraining() {
+  $("#trainForm").reset();
+  $("#tType").value = store.get("lastSport", 0);
+  estimateKcal();
+  $("#trainDlg").showModal();
+}
+
+$("#trainForm").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const i = +$("#tType").value;
+  const list = getTrainings();
+  list.push({
+    id: Date.now() + Math.random(),
+    name: SPORTS[i][0],
+    min: +$("#tDuration").value,
+    kcal: +$("#tKcal").value || 0,
+    note: $("#tNote").value.trim(),
+  });
+  saveTrainings(list);
+  store.set("lastSport", i);
+  $("#trainDlg").close();
+  render();
+});
+
+function renderTraining() {
+  const list = getTrainings();
+  $("#burned").textContent = round(list.reduce((a, t) => a + t.kcal, 0));
+  $("#tCount").textContent = list.length;
+  $("#tMin").textContent = list.reduce((a, t) => a + t.min, 0);
+  $("#tEmpty").textContent = day === dateStr() ? "Heute noch kein Training." : "Kein Training an diesem Tag.";
+  $("#tEmpty").hidden = list.length > 0;
+
+  const ul = $("#trainings");
+  ul.innerHTML = "";
+  list.forEach((t) => {
+    const li = document.createElement("li");
+    li.innerHTML = `<div class="info"><div class="name"></div><div class="sub"></div></div>
+      <span class="kcal">${round(t.kcal)} kcal</span>
+      <button class="del" aria-label="Löschen">✕</button>`;
+    li.querySelector(".name").textContent = t.name;
+    li.querySelector(".sub").textContent = t.min + " Min" + (t.note ? " · " + t.note : "");
+    li.querySelector(".del").onclick = () => {
+      saveTrainings(getTrainings().filter((x) => x.id !== t.id));
+      render();
+    };
+    ul.appendChild(li);
+  });
 }
 
 // ---------- Open Food Facts ----------
@@ -360,11 +567,13 @@ $("#codeForm").addEventListener("submit", (ev) => {
 // ---------- Einstellungen ----------
 $("#openSettings").onclick = () => {
   $("#goalInput").value = store.get("goal", 2000);
+  $("#wGoalInput").value = store.get("weightGoal", "") ?? "";
   $("#settingsDlg").showModal();
 };
 $("#settingsForm").addEventListener("submit", (ev) => {
   ev.preventDefault();
   store.set("goal", +$("#goalInput").value);
+  store.set("weightGoal", parseFloat($("#wGoalInput").value) || null);
   $("#settingsDlg").close();
   render();
 });
@@ -377,7 +586,11 @@ document.querySelectorAll("[data-close]").forEach((b) => {
   };
 });
 $("#addDlg").addEventListener("close", stopScan);
-$("#openAdd").onclick = openAdd;
+$("#openAdd").onclick = () => {
+  if (view === "weight") openWeight();
+  else if (view === "train") openTraining();
+  else openAdd();
+};
 $("#prevDay").onclick = () => { day = shiftDay(day, -1); render(); };
 $("#nextDay").onclick = () => { if (day < dateStr()) { day = shiftDay(day, 1); render(); } };
 
