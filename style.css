@@ -98,6 +98,56 @@ h3 { font-size: .9rem; margin: 18px 0 6px; color: var(--muted); }
 .up { color: var(--danger); }
 .down { color: var(--accent); }
 
+.card + .card, .card + #meals, #meals + .card { margin-top: 12px; }
+.small { font-size: .78rem; }
+
+.hint { margin-bottom: 12px; border-color: var(--accent); }
+.hint p { margin: 6px 0 12px; color: var(--muted); }
+.btn {
+  border: 0; border-radius: 10px; padding: 11px 16px; cursor: pointer;
+  background: var(--track); color: var(--text); font-weight: 600; width: 100%;
+}
+.btn.primary { background: var(--accent); color: var(--accent-text); }
+
+.water { display: flex; align-items: center; gap: 12px; }
+.water-info { flex: 1; min-width: 0; }
+.water-info small { display: block; color: var(--muted); margin: 2px 0 6px; }
+.glasses { display: flex; flex-wrap: wrap; gap: 4px; }
+.glasses i { width: 14px; height: 18px; border-radius: 2px 2px 5px 5px; background: var(--track); }
+.glasses i.full { background: #3b82f6; }
+.water-btns { display: flex; gap: 8px; }
+.round-btn {
+  width: 44px; height: 44px; border-radius: 99px; border: 0; cursor: pointer;
+  background: var(--track); color: var(--text); font-size: 1.4rem; line-height: 1;
+}
+.round-btn.plus { background: #3b82f6; color: #fff; }
+
+.meal-head { display: flex; align-items: center; gap: 8px; margin: 20px 0 8px; }
+.meal-head h2 { margin: 0; flex: 1; }
+.meal-head span { color: var(--muted); font-size: .9rem; }
+.meal-head .add-meal {
+  border: 0; background: var(--track); color: var(--accent); font-weight: 700;
+  width: 32px; height: 32px; border-radius: 99px; cursor: pointer; font-size: 1.2rem;
+}
+
+.meal-pick, .seg { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 8px; }
+.meal-pick button, .seg button {
+  flex: 1; border: 1px solid var(--line); background: var(--bg); color: var(--muted);
+  padding: 7px 4px; border-radius: 99px; font-size: .82rem; font-weight: 600; cursor: pointer;
+}
+.meal-pick button.active, .seg button.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+
+.week h2 { margin-top: 0; }
+.week-bars { display: flex; align-items: flex-end; gap: 6px; height: 90px; position: relative; }
+.week-bars .goal-line { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--muted); }
+.week-bars .col { flex: 1; display: flex; justify-content: center; align-items: flex-end; height: 100%; }
+.week-bars .b { width: 100%; max-width: 32px; background: var(--accent); border-radius: 6px 6px 2px 2px; min-height: 3px; }
+.week-bars .b.over { background: var(--danger); }
+.week-bars .b.none { background: var(--track); }
+.week-labels { display: flex; gap: 6px; margin: 4px 0 10px; }
+.week-labels small { flex: 1; text-align: center; font-size: .7rem; color: var(--muted); }
+.week-labels small.today { color: var(--text); font-weight: 700; }
+
 select {
   width: 100%; padding: 11px 12px; font-size: 1rem;
   border: 1px solid var(--line); border-radius: 10px;

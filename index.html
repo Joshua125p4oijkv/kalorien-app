@@ -20,6 +20,12 @@
 
   <main>
    <div class="view" id="view-food">
+    <section class="card hint" id="goalHint" hidden>
+      <b>Willkommen! 👋</b>
+      <p>Lass dir zuerst dein persönliches Tagesziel berechnen.</p>
+      <button class="btn primary" id="hintCalc">Tagesziel berechnen</button>
+    </section>
+
     <section class="card summary">
       <div class="big"><span id="remaining">0</span><small>kcal übrig</small></div>
       <div class="bar"><div id="barFill"></div></div>
@@ -35,10 +41,28 @@
       </div>
     </section>
 
-    <section>
-      <h2>Einträge</h2>
-      <ul id="entries" class="list"></ul>
-      <p id="empty" class="muted">Noch nichts eingetragen.</p>
+    <section class="card water">
+      <div class="water-info">
+        <b>💧 Wasser</b>
+        <small id="waterText">0 von 8 Gläsern</small>
+        <div class="glasses" id="glasses"></div>
+      </div>
+      <div class="water-btns">
+        <button class="round-btn" id="waterMinus" aria-label="Ein Glas weniger">−</button>
+        <button class="round-btn plus" id="waterPlus" aria-label="Ein Glas mehr">+</button>
+      </div>
+    </section>
+
+    <div id="meals"></div>
+
+    <section class="card week">
+      <h2>Letzte 7 Tage</h2>
+      <div class="week-bars" id="weekBars"></div>
+      <div class="week-labels" id="weekLabels"></div>
+      <div class="row">
+        <span>Ø gegessen: <b id="weekAvg">–</b></span>
+        <span>Tage im Ziel: <b id="weekOk">–</b></span>
+      </div>
     </section>
    </div>
 
@@ -122,6 +146,7 @@
         <h2>Essen hinzufügen</h2>
         <button class="icon-btn" data-close aria-label="Schließen">✕</button>
       </div>
+      <div class="meal-pick" id="mealPick"></div>
       <div class="tabs">
         <button data-tab="search" class="active">Suchen</button>
         <button data-tab="scan">Scannen</button>
@@ -188,8 +213,50 @@
       </div>
       <form id="settingsForm" class="stack">
         <label>Tagesziel (kcal) <input id="goalInput" type="number" min="500" max="10000" required></label>
+        <button type="button" class="btn" id="openCalc">🧮 Tagesziel berechnen lassen</button>
         <label>Zielgewicht in kg (optional) <input id="wGoalInput" type="number" min="20" max="400" step="0.1"></label>
+        <label>Wasser-Ziel (Gläser à 250 ml) <input id="waterGoalInput" type="number" min="1" max="30" required></label>
         <button type="submit" class="primary">Speichern</button>
+      </form>
+    </div>
+  </dialog>
+
+  <!-- Kalorienrechner -->
+  <dialog id="calcDlg">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2>Tagesziel berechnen</h2>
+        <button class="icon-btn" data-close aria-label="Schließen">✕</button>
+      </div>
+      <form id="calcForm" class="stack">
+        <div class="seg" id="cSex">
+          <button type="button" data-v="m" class="active">Mann</button>
+          <button type="button" data-v="w">Frau</button>
+        </div>
+        <div class="three">
+          <label>Alter <input id="cAge" type="number" min="12" max="100" required></label>
+          <label>Größe cm <input id="cHeight" type="number" min="100" max="250" required></label>
+          <label>Gewicht kg <input id="cWeight" type="number" min="30" max="300" step="0.1" required></label>
+        </div>
+        <label>Alltag (ohne Sport – den trägst du extra ein)
+          <select id="cActivity">
+            <option value="1.2">Viel sitzen (Büro, Schule)</option>
+            <option value="1.375" selected>Etwas auf den Beinen</option>
+            <option value="1.55">Viel auf den Beinen (z. B. Verkauf)</option>
+            <option value="1.725">Körperliche Arbeit (z. B. Bau)</option>
+          </select>
+        </label>
+        <label>Dein Ziel
+          <select id="cGoal">
+            <option value="-500">Abnehmen (ca. 0,5 kg pro Woche)</option>
+            <option value="-250">Langsam abnehmen</option>
+            <option value="0" selected>Gewicht halten</option>
+            <option value="250">Langsam zunehmen / Muskeln aufbauen</option>
+          </select>
+        </label>
+        <p class="result">Dein Tagesziel: <b id="cResult">–</b> kcal</p>
+        <button type="submit" class="primary">Als Tagesziel übernehmen</button>
+        <p class="muted small">Grobe Schätzung (Mifflin-St-Jeor-Formel). Kein Ersatz für ärztlichen Rat.</p>
       </form>
     </div>
   </dialog>

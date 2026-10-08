@@ -80,35 +80,193 @@ function renderFood() {
   fill.style.width = Math.min(100, (sum.kcal / budget) * 100) + "%";
   fill.classList.toggle("over", rest < 0);
 
-  const ul = $("#entries");
-  ul.innerHTML = "";
-  entries.forEach((e) => {
-    const li = document.createElement("li");
-    li.innerHTML = `
-      <div class="info">
-        <div class="name"></div>
-        <div class="sub"></div>
-      </div>
-      <span class="kcal">${round(e.kcal)} kcal</span>
-      <button class="del" aria-label="Löschen">✕</button>`;
-    li.querySelector(".name").textContent = e.name;
-    li.querySelector(".sub").textContent =
-      (e.grams ? e.grams + " g · " : "") + `E ${round(e.p)} · K ${round(e.c)} · F ${round(e.f)}`;
-    li.querySelector(".del").onclick = () => {
-      saveEntries(getEntries().filter((x) => x.id !== e.id));
-      render();
-    };
-    ul.appendChild(li);
-  });
-  $("#empty").hidden = entries.length > 0;
+  $("#goalHint").hidden = store.get("goal", null) !== null;
+
+  renderMeals(entries);
+  renderWater();
+  renderWeek();
 }
+
+// ---------- Mahlzeiten ----------
+const MEALS = [
+  ["breakfast", "Frühstück"],
+  ["lunch", "Mittagessen"],
+  ["dinner", "Abendessen"],
+  ["snack", "Snacks"],
+];
+
+// Passende Mahlzeit nach Uhrzeit vorschlagen
+function mealByTime() {
+  const h = new Date().getHours();
+  if (h < 11) return "breakfast";
+  if (h < 15) return "lunch";
+  if (h >= 17 && h < 22) return "dinner";
+  return "snack";
+}
+
+function renderMeals(entries) {
+  const box = $("#meals");
+  box.innerHTML = "";
+  MEALS.forEach(([key, label]) => {
+    const list = entries.filter((e) => (e.meal || "snack") === key);
+    const kcal = list.reduce((a, e) => a + e.kcal, 0);
+    const head = document.createElement("div");
+    head.className = "meal-head";
+    head.innerHTML = `<h2>${label}</h2><span>${list.length ? round(kcal) + " kcal" : ""}</span>
+      <button class="add-meal" aria-label="${label} hinzufügen">+</button>`;
+    head.querySelector(".add-meal").onclick = () => openAdd(key);
+    box.appendChild(head);
+
+    const ul = document.createElement("ul");
+    ul.className = "list";
+    list.forEach((e) => {
+      const li = document.createElement("li");
+      li.innerHTML = `
+        <div class="info">
+          <div class="name"></div>
+          <div class="sub"></div>
+        </div>
+        <span class="kcal">${round(e.kcal)} kcal</span>
+        <button class="del" aria-label="Löschen">✕</button>`;
+      li.querySelector(".name").textContent = e.name;
+      li.querySelector(".sub").textContent =
+        (e.grams ? e.grams + " g · " : "") + `E ${round(e.p)} · K ${round(e.c)} · F ${round(e.f)}`;
+      li.querySelector(".del").onclick = () => {
+        saveEntries(getEntries().filter((x) => x.id !== e.id));
+        render();
+      };
+      ul.appendChild(li);
+    });
+    box.appendChild(ul);
+  });
+}
+
+let currentMeal = "snack";
+
+function setMeal(key) {
+  currentMeal = key;
+  document.querySelectorAll("#mealPick button").forEach((b) => b.classList.toggle("active", b.dataset.meal === key));
+}
+
+$("#mealPick").innerHTML = MEALS.map(([k, l]) => `<button type="button" data-meal="${k}">${l}</button>`).join("");
+document.querySelectorAll("#mealPick button").forEach((b) => (b.onclick = () => setMeal(b.dataset.meal)));
 
 function addEntry(entry) {
   const list = getEntries();
-  list.push({ id: Date.now() + Math.random(), ...entry });
+  list.push({ id: Date.now() + Math.random(), meal: currentMeal, ...entry });
   saveEntries(list);
   render();
 }
+
+// ---------- Wasser ----------
+function renderWater() {
+  const n = store.get("water", {})[day] || 0;
+  const goal = store.get("waterGoal", 8);
+  $("#waterText").textContent = `${n} von ${goal} Gläsern (${(n * 0.25).toFixed(2).replace(".", ",")} l)`;
+  $("#glasses").innerHTML = Array.from({ length: Math.max(goal, n) }, (_, i) => `<i class="${i < n ? "full" : ""}"></i>`).join("");
+  $("#waterMinus").disabled = n === 0;
+}
+
+function changeWater(delta) {
+  const all = store.get("water", {});
+  const n = Math.max(0, (all[day] || 0) + delta);
+  if (n) all[day] = n; else delete all[day];
+  store.set("water", all);
+  renderWater();
+}
+$("#waterPlus").onclick = () => changeWater(1);
+$("#waterMinus").onclick = () => changeWater(-1);
+
+// ---------- Wochenübersicht ----------
+const WEEKDAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+
+function renderWeek() {
+  const goal = store.get("goal", 2000);
+  const entries = store.get("entries", {});
+  const workouts = store.get("workouts", {});
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = shiftDay(day, -i);
+    const eaten = (entries[d] || []).reduce((a, e) => a + e.kcal, 0);
+    const burned = (workouts[d] || []).reduce((a, t) => a + t.kcal, 0);
+    days.push({ d, eaten, budget: goal + burned, has: (entries[d] || []).length > 0 });
+  }
+  const max = Math.max(goal * 1.3, ...days.map((x) => x.eaten));
+  const bars = $("#weekBars");
+  bars.innerHTML = `<div class="goal-line" style="bottom:${(goal / max) * 100}%"></div>`;
+  $("#weekLabels").innerHTML = "";
+  days.forEach((x) => {
+    const col = document.createElement("div");
+    col.className = "col";
+    const cls = !x.has ? "none" : x.eaten > x.budget ? "over" : "";
+    col.innerHTML = `<div class="b ${cls}" style="height:${x.has ? (x.eaten / max) * 100 : 3}%"></div>`;
+    col.title = `${dayLabel(x.d)}: ${round(x.eaten)} kcal`;
+    bars.appendChild(col);
+    const [y, m, dd] = x.d.split("-").map(Number);
+    const lab = document.createElement("small");
+    lab.textContent = WEEKDAYS[new Date(y, m - 1, dd).getDay()];
+    if (x.d === day) lab.className = "today";
+    $("#weekLabels").appendChild(lab);
+  });
+  const filled = days.filter((x) => x.has);
+  $("#weekAvg").textContent = filled.length ? round(filled.reduce((a, x) => a + x.eaten, 0) / filled.length) + " kcal" : "–";
+  $("#weekOk").textContent = filled.length ? `${filled.filter((x) => x.eaten <= x.budget).length} von ${filled.length}` : "–";
+}
+
+// ---------- Kalorienrechner ----------
+let calcSex = "m";
+
+function calcResult() {
+  const age = +$("#cAge").value, h = +$("#cHeight").value;
+  const w = parseFloat(String($("#cWeight").value).replace(",", "."));
+  if (!age || !h || !w) return null;
+  // Mifflin-St-Jeor: Grundumsatz
+  const bmr = 10 * w + 6.25 * h - 5 * age + (calcSex === "m" ? 5 : -161);
+  const total = bmr * +$("#cActivity").value + +$("#cGoal").value;
+  return Math.max(1200, Math.round(total / 10) * 10);
+}
+
+function updateCalc() {
+  const r = calcResult();
+  $("#cResult").textContent = r ?? "–";
+}
+
+function openCalc() {
+  const saved = store.get("calc", {});
+  calcSex = saved.sex || "m";
+  document.querySelectorAll("#cSex button").forEach((b) => b.classList.toggle("active", b.dataset.v === calcSex));
+  $("#cAge").value = saved.age || "";
+  $("#cHeight").value = saved.height || "";
+  $("#cWeight").value = latestWeight() || saved.weight || "";
+  if (saved.activity) $("#cActivity").value = saved.activity;
+  if (saved.goal != null) $("#cGoal").value = saved.goal;
+  updateCalc();
+  $("#calcDlg").showModal();
+}
+
+document.querySelectorAll("#cSex button").forEach((b) => (b.onclick = () => {
+  calcSex = b.dataset.v;
+  document.querySelectorAll("#cSex button").forEach((x) => x.classList.toggle("active", x === b));
+  updateCalc();
+}));
+["#cAge", "#cHeight", "#cWeight", "#cActivity", "#cGoal"].forEach((s) => $(s).addEventListener("input", updateCalc));
+
+$("#calcForm").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const r = calcResult();
+  if (!r) return;
+  store.set("calc", {
+    sex: calcSex, age: +$("#cAge").value, height: +$("#cHeight").value,
+    weight: +$("#cWeight").value, activity: $("#cActivity").value, goal: +$("#cGoal").value,
+  });
+  store.set("goal", r);
+  $("#goalInput").value = r;
+  $("#calcDlg").close();
+  render();
+});
+
+$("#hintCalc").onclick = openCalc;
+$("#openCalc").onclick = openCalc;
 
 // ---------- Ansichten (Essen / Gewicht / Training) ----------
 let view = "food";
@@ -417,7 +575,8 @@ $("#amountForm").addEventListener("submit", (ev) => {
 });
 
 // ---------- Hinzufügen-Fenster ----------
-function openAdd() {
+function openAdd(meal) {
+  setMeal(meal || mealByTime());
   showTab("search");
   $("#results").innerHTML = "";
   $("#searchStatus").textContent = "";
@@ -568,11 +727,13 @@ $("#codeForm").addEventListener("submit", (ev) => {
 $("#openSettings").onclick = () => {
   $("#goalInput").value = store.get("goal", 2000);
   $("#wGoalInput").value = store.get("weightGoal", "") ?? "";
+  $("#waterGoalInput").value = store.get("waterGoal", 8);
   $("#settingsDlg").showModal();
 };
 $("#settingsForm").addEventListener("submit", (ev) => {
   ev.preventDefault();
   store.set("goal", +$("#goalInput").value);
+  store.set("waterGoal", +$("#waterGoalInput").value || 8);
   store.set("weightGoal", parseFloat($("#wGoalInput").value) || null);
   $("#settingsDlg").close();
   render();
