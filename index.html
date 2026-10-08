@@ -218,6 +218,15 @@
         <label>Wasser-Ziel (Gläser à 250 ml) <input id="waterGoalInput" type="number" min="1" max="30" required></label>
         <button type="submit" class="primary">Speichern</button>
       </form>
+
+      <h3>Daten sichern</h3>
+      <div class="stack">
+        <p class="muted small" id="backupInfo">Noch kein Backup erstellt.</p>
+        <button type="button" class="btn" id="backupBtn">💾 Backup erstellen</button>
+        <button type="button" class="btn" id="restoreBtn">📂 Backup wiederherstellen</button>
+        <input type="file" id="restoreFile" accept=".json,application/json" hidden>
+        <p class="muted small">Deine Daten liegen nur auf diesem Gerät. Speichere das Backup z. B. in der Dateien-App oder in iCloud Drive.</p>
+      </div>
     </div>
   </dialog>
 

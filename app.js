@@ -265,6 +265,76 @@ $("#calcForm").addEventListener("submit", (ev) => {
   render();
 });
 
+// ---------- Backup ----------
+// Alle App-Daten (localStorage-Schlüssel mit "kt_") als Datei sichern und wieder laden.
+function collectData() {
+  const data = {};
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k.startsWith("kt_") && k !== "kt_lastBackup") data[k] = localStorage.getItem(k);
+  }
+  return data;
+}
+
+function renderBackupInfo() {
+  const last = store.get("lastBackup", null);
+  if (!last) {
+    $("#backupInfo").textContent = "Noch kein Backup erstellt.";
+    return;
+  }
+  const days = Math.floor((Date.now() - last) / 86400000);
+  const when = days === 0 ? "heute" : days === 1 ? "gestern" : `vor ${days} Tagen`;
+  $("#backupInfo").textContent = `Letztes Backup: ${when}` + (days >= 7 ? " – Zeit für ein neues!" : "");
+}
+
+$("#backupBtn").onclick = async () => {
+  const backup = { app: "kalorien-tracker", version: 1, created: new Date().toISOString(), data: collectData() };
+  const name = `kalorien-backup-${dateStr()}.json`;
+  const file = new File([JSON.stringify(backup)], name, { type: "application/json" });
+  try {
+    // iPhone/Android: Teilen-Menü ("In Dateien sichern")
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: "Kalorien-Backup" });
+    } else {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(file);
+      a.download = name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    }
+    store.set("lastBackup", Date.now());
+    renderBackupInfo();
+  } catch (e) {
+    if (e.name !== "AbortError") alert("Backup hat nicht geklappt.");
+  }
+};
+
+$("#restoreBtn").onclick = () => $("#restoreFile").click();
+
+$("#restoreFile").addEventListener("change", async (ev) => {
+  const f = ev.target.files[0];
+  ev.target.value = "";
+  if (!f) return;
+  let backup;
+  try {
+    backup = JSON.parse(await f.text());
+  } catch {
+    return alert("Diese Datei ist kein gültiges Backup.");
+  }
+  if (backup?.app !== "kalorien-tracker" || typeof backup.data !== "object") {
+    return alert("Diese Datei ist kein Backup dieser App.");
+  }
+  const when = backup.created ? new Date(backup.created).toLocaleDateString("de-DE") : "unbekannt";
+  if (!confirm(`Backup vom ${when} laden?\n\nDeine aktuellen Daten werden dabei ersetzt.`)) return;
+  Object.keys(collectData()).forEach((k) => localStorage.removeItem(k));
+  Object.entries(backup.data).forEach(([k, v]) => {
+    if (k.startsWith("kt_") && typeof v === "string") localStorage.setItem(k, v);
+  });
+  $("#settingsDlg").close();
+  render();
+  alert("Backup wurde geladen ✅");
+});
+
 $("#hintCalc").onclick = openCalc;
 $("#openCalc").onclick = openCalc;
 
@@ -728,6 +798,7 @@ $("#openSettings").onclick = () => {
   $("#goalInput").value = store.get("goal", 2000);
   $("#wGoalInput").value = store.get("weightGoal", "") ?? "";
   $("#waterGoalInput").value = store.get("waterGoal", 8);
+  renderBackupInfo();
   $("#settingsDlg").showModal();
 };
 $("#settingsForm").addEventListener("submit", (ev) => {
